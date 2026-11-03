@@ -1,0 +1,8 @@
+server.txt
+.env
+.env.*
+*.pem
+*.key
+**/results/
+**/bin/
+**/__pycache__/

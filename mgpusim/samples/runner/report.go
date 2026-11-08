@@ -69,31 +69,13 @@ func (r *Runner) defineMetrics() {
 }
 
 func (r *Runner) addKernelTimeTracer() {
-	if r.platform.GRIT != nil {
-		// A shared-page microbenchmark may launch on physical GPUs even when a
-		// unified device exists. BusyTimeTracer takes the union, avoiding overlap.
-		r.kernelTimeCounter = tracing.NewBusyTimeTracer(r.platform.Engine, func(task tracing.Task) bool {
-			return task.What == "*driver.LaunchKernelCommand" || task.What == "*driver.LaunchUnifiedMultiGPUKernelCommand"
-		})
-		tracing.CollectTrace(r.platform.Driver, r.kernelTimeCounter)
-	} else {
-		if *unifiedGPUFlag != "" {
-			r.kernelTimeCounter = tracing.NewBusyTimeTracer(
-				r.platform.Engine,
-				func(task tracing.Task) bool {
-					return task.What == "*driver.LaunchUnifiedMultiGPUKernelCommand"
-				})
-			tracing.CollectTrace(r.platform.Driver, r.kernelTimeCounter)
-		} else {
-			r.kernelTimeCounter = tracing.NewBusyTimeTracer(
-				r.platform.Engine,
-				func(task tracing.Task) bool {
-					return task.What == "*driver.LaunchKernelCommand"
-				})
-			tracing.CollectTrace(r.platform.Driver, r.kernelTimeCounter)
-		}
-
-	}
+	// Workloads may explicitly launch physical shards while a virtual device
+	// exists. Count the union of both command types in every policy, including
+	// mode off, so supported physical launches never report zero kernel time.
+	r.kernelTimeCounter = tracing.NewBusyTimeTracer(r.platform.Engine, func(task tracing.Task) bool {
+		return task.What == "*driver.LaunchKernelCommand" || task.What == "*driver.LaunchUnifiedMultiGPUKernelCommand"
+	})
+	tracing.CollectTrace(r.platform.Driver, r.kernelTimeCounter)
 
 	for _, gpu := range r.platform.GPUs {
 		gpuKernelTimeCounter := tracing.NewBusyTimeTracer(
